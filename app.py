@@ -1,10 +1,23 @@
 from flask import Flask, request, jsonify
 from flask.json import JSONEncoder
 
+## Default JSON encoder 는 set를 JSON으로 변환할수 없다.
+## 그러므로 커스텀 엔코더를 작성해서 SET을 LIST로 변환하여 
+## JSON으로 변환 가능하게 해주어야 한다.
+
+class CustomJSONEncoder(JSONEncoder):
+	def default(self, obj):
+		if isinstance(obj, set):
+			return list(obj)
+
+		return JSONEncoder.default(self,obj)
+
+
 app = Flask(__name__)
 app.users = {}
 app.id_count = 1
 app.tweets = []
+app.json_encoder = CustomJSONEncoder
 
 @app.route("/ping", methods=['GET'])
 def ping():
@@ -78,5 +91,20 @@ def unfollow():
 	user.setdefault('follow',set()).discard(user_id_to_follow)
 
 	return jsonify(user)
+
+@app.route('/timeline/<int:user_id>', methods=['GET'])
+def timeline(user_id):
+	if user_id not in app.users:
+		return '사용자가 존재하지 않습니다.', 400
+
+	follow_list = app.users[user_id].get('follow',set())
+	follow_list.add(user_id)
+	timeline = [tweet for tweet in app.tweets if tweet['user_id'] in follow_list]
+	
+	return jsonify({
+			'user_id' : user_id,
+			'timeline' : timeline
+
+			})
 
 
